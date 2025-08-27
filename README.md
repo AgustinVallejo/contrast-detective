@@ -20,7 +20,7 @@ A minimal Chrome extension that analyzes web pages for WCAG AA color contrast co
 1. Navigate to any webpage
 2. Click the Contrast Detective icon in your toolbar
 3. Click "Analyze Current Page" 
-4. View any contrast violations found
+4. View any contrast warnings found
 
 ## Files
 
