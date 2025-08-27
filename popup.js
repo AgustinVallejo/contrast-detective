@@ -66,12 +66,42 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Get image data
                 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                 
-                // Analyze using grid analysis
-                const violations = gridAnalysis(imageData, 32);
+                // Analyze using grid analysis with smaller blocks for more detail
+                const violations = gridAnalysis(imageData, 16);
+                
+                // Draw violations on canvas
+                drawViolationsOnCanvas(ctx, violations);
+                
+                // Replace the screenshot with the annotated version
+                displayAnnotatedScreenshot(canvas);
+                
                 resolve(violations);
             };
             img.src = dataUrl;
         });
+    }
+
+    function drawViolationsOnCanvas(ctx, violations) {
+        // Draw violation overlays using the same style as the original React component
+        violations.forEach(violation => {
+            const opacity = violation.score; // Use severity score for opacity
+            const blockSize = 16; // Match the analysis block size
+            
+            // Deep pink color like the original, with opacity based on score
+            ctx.fillStyle = `rgba(255, 20, 147, ${opacity * 0.6 + 0.1})`;
+            ctx.fillRect(violation.x, violation.y, blockSize, blockSize);
+            
+            // Stroke with slightly higher opacity
+            ctx.strokeStyle = `rgba(255, 20, 147, ${opacity * 0.8 + 0.2})`;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(violation.x, violation.y, blockSize, blockSize);
+        });
+    }
+
+    function displayAnnotatedScreenshot(canvas) {
+        canvas.className = 'screenshot';
+        screenshotContainer.innerHTML = '';
+        screenshotContainer.appendChild(canvas);
     }
 
     function displayResults(violations) {
@@ -80,19 +110,27 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        const violationsHtml = violations.map((violation, index) => `
-            <div class="violation">
-                <strong>Violation ${index + 1}</strong><br>
-                <strong>Contrast Ratio: ${violation.ratio.toFixed(2)}:1</strong> 
-                ${violation.ratio < 2.0 ? '🔴' : '🟡'}<br>
-                Severity Score: ${violation.score.toFixed(2)}<br>
-                Location: (${violation.x}, ${violation.y})<br>
-                ${violation.colors && violation.colors.length >= 2 ? 
-                    `Colors: rgb(${violation.colors[0].r},${violation.colors[0].g},${violation.colors[0].b}) / rgb(${violation.colors[1].r},${violation.colors[1].g},${violation.colors[1].b})` : ''}
+        // Calculate summary statistics
+        const worstRatio = Math.min(...violations.map(v => v.ratio));
+        const avgScore = violations.reduce((sum, v) => sum + v.score, 0) / violations.length;
+        
+        const summaryHtml = `
+            <div style="background: #374151; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
+                <strong>Contrast Analysis Results</strong><br>
+                <div style="margin-top: 8px;">
+                    � Low-contrast regions: ${violations.length}<br>
+                    ⚠️ Worst ratio: ${worstRatio.toFixed(2)}:1<br>
+                    📊 Average severity: ${avgScore.toFixed(2)}<br>
+                    🎯 Block size: 16×16 pixels
+                </div>
             </div>
-        `).join('');
+            <div style="font-size: 11px; color: #94a3b8; text-align: center;">
+                Pink overlays show contrast violations.<br>
+                Opacity indicates severity (darker = worse)
+            </div>
+        `;
 
-        resultsDiv.innerHTML = violationsHtml;
+        resultsDiv.innerHTML = summaryHtml;
     }
 
     // =============================================================================
@@ -244,6 +282,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         }
-        return results.slice(0, 20); // Limit to 20 violations
+        return results; // Return all violations, no limit
     }
 });
