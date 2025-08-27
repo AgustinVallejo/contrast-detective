@@ -7,18 +7,25 @@ document.addEventListener('DOMContentLoaded', function() {
     const zoomOutBtn = document.getElementById('zoomOutBtn');
     const resetZoomBtn = document.getElementById('resetZoomBtn');
     const zoomLevelSpan = document.getElementById('zoomLevel');
+    const thresholdControls = document.getElementById('thresholdControls');
+    const thresholdSlider = document.getElementById('thresholdSlider');
+    const thresholdValue = document.getElementById('thresholdValue');
 
     let currentZoom = 1;
     let currentScreenshot = null;
     let isDragging = false;
     let dragStart = { x: 0, y: 0 };
     let imagePosition = { x: 0, y: 0 };
+    let currentThreshold = 1.0;
+    let allViolations = []; // Store all violations
+    let filteredViolations = []; // Store filtered violations
 
     analyzeBtn.addEventListener('click', async function() {
         analyzeBtn.disabled = true;
         analyzeBtn.textContent = 'Capturing...';
         resultsDiv.innerHTML = '<div class="loading">Capturing screenshot...</div>';
         screenshotContainer.innerHTML = '';
+        thresholdControls.style.display = 'none';
         resetZoom();
 
         try {
@@ -62,6 +69,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
     resetZoomBtn.addEventListener('click', function() {
         resetZoom();
+    });
+
+    // Threshold slider event listener
+    thresholdSlider.addEventListener('input', function() {
+        currentThreshold = parseFloat(thresholdSlider.value);
+        thresholdValue.textContent = currentThreshold.toFixed(1);
+        
+        // Re-filter and redraw violations
+        if (allViolations.length > 0) {
+            filterAndRedrawViolations();
+        }
     });
 
     // Keyboard shortcuts
@@ -112,6 +130,39 @@ document.addEventListener('DOMContentLoaded', function() {
                 break;
         }
     });
+
+    // Threshold filtering function
+    function filterAndRedrawViolations() {
+        // Filter violations based on current threshold - show only violations BELOW the threshold
+        // (i.e., hide low-contrast violations that are close to 1:1)
+        filteredViolations = allViolations.filter(violation => violation.ratio >= currentThreshold);
+        
+        // Redraw the screenshot with filtered violations
+        if (currentScreenshot) {
+            redrawViolationsOnScreenshot();
+            displayResults(filteredViolations);
+        }
+    }
+
+    function redrawViolationsOnScreenshot() {
+        // Get the original image data and redraw with filtered violations
+        const canvas = currentScreenshot.tagName === 'CANVAS' ? currentScreenshot : null;
+        if (canvas) {
+            // Clear the canvas and redraw the original image with filtered violations
+            const ctx = canvas.getContext('2d');
+            
+            // Clear the canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Redraw the original image (we need to store this separately)
+            if (window.originalImageData) {
+                ctx.putImageData(window.originalImageData, 0, 0);
+            }
+            
+            // Draw filtered violations
+            drawViolationsOnCanvas(ctx, filteredViolations);
+        }
+    }
 
     // Zoom functions
     function zoomIn() {
@@ -236,19 +287,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Draw image to canvas
                 ctx.drawImage(img, 0, 0);
                 
+                // Store original image data for redrawing
+                window.originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                
                 // Get image data
                 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                 
                 // Analyze using grid analysis with smaller blocks for more detail
-                const violations = gridAnalysis(imageData, 16);
+                allViolations = gridAnalysis(imageData, 16);
                 
-                // Draw violations on canvas
-                drawViolationsOnCanvas(ctx, violations);
+                // Filter violations based on current threshold
+                filteredViolations = allViolations.filter(violation => violation.ratio >= currentThreshold);
+                
+                // Draw filtered violations on canvas
+                drawViolationsOnCanvas(ctx, filteredViolations);
                 
                 // Replace the screenshot with the annotated version
                 displayAnnotatedScreenshot(canvas);
                 
-                resolve(violations);
+                // Show threshold controls
+                thresholdControls.style.display = 'block';
+                
+                resolve(filteredViolations);
             };
             img.src = dataUrl;
         });
@@ -295,22 +355,37 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function displayResults(violations) {
         if (!violations || violations.length === 0) {
-            resultsDiv.innerHTML = '<div class="no-violations">✅ No contrast violations found!</div>';
+            const totalViolations = allViolations.length;
+            if (totalViolations > 0) {
+                resultsDiv.innerHTML = `
+                    <div class="no-violations">
+                        ✅ No violations above ${currentThreshold.toFixed(1)}:1 threshold<br>
+                        <small>${totalViolations} total violations found (${totalViolations - violations.length} hidden below threshold)</small>
+                    </div>
+                `;
+            } else {
+                resultsDiv.innerHTML = '<div class="no-violations">✅ No contrast violations found!</div>';
+            }
             return;
         }
 
         // Calculate summary statistics
         const worstRatio = Math.min(...violations.map(v => v.ratio));
         const avgScore = violations.reduce((sum, v) => sum + v.score, 0) / violations.length;
+        const totalViolations = allViolations.length;
+        const filteredCount = violations.length;
+        const hiddenCount = totalViolations - filteredCount;
+        
+        const filterInfo = hiddenCount > 0 ? 
+            `<br>� Showing ${filteredCount} violations (${hiddenCount} hidden below ${currentThreshold.toFixed(1)}:1)` : 
+            `<br>📊 Showing all ${totalViolations} violations`;
         
         const summaryHtml = `
             <div style="background: #374151; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
                 <strong>Contrast Analysis Results</strong><br>
                 <div style="margin-top: 8px;">
-                    � Low-contrast regions: ${violations.length}<br>
-                    ⚠️ Worst ratio: ${worstRatio.toFixed(2)}:1<br>
-                    📊 Average severity: ${avgScore.toFixed(2)}<br>
-                    🎯 Block size: 16×16 pixels
+                    ⚠️ Visible violations: ${filteredCount}<br>
+                    🎯 Block size: 16×16 pixels${filterInfo}
                 </div>
             </div>
             <div style="font-size: 11px; color: #94a3b8; text-align: center;">
@@ -353,9 +428,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function uiContrastViolationScore(ratio) {
+        // Always return a score for ratios below 3.0 (WCAG AA minimum)
         if (ratio >= 3.0) return 0;
         if (ratio <= 1.0) return 1.0;
         
+        // Create a more nuanced scoring that works well with the threshold
         const t = (ratio - 1.0) / (3.0 - 1.0);
         return 0.5 * (1 + Math.cos(Math.PI * t));
     }
@@ -445,7 +522,7 @@ document.addEventListener('DOMContentLoaded', function() {
             score,
             ratio,
             colors,
-            compliant: ratio >= 3.0
+            compliant: ratio >= 3.0 // Still use 3.0 as the WCAG AA baseline
         };
     }
 
@@ -462,6 +539,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const regionResult = analyzeUIRegion(imageData, x, y, w, h);
                 
+                // Capture all violations below 3.0:1 (WCAG AA), not just below current threshold
                 if (!regionResult.compliant) {
                     results.push({
                         ...regionResult,
@@ -471,6 +549,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         }
-        return results; // Return all violations, no limit
+        return results; // Return all violations below 3.0:1
     }
 });

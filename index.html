@@ -7,7 +7,7 @@
     <style>
         body {
             width: 450px;
-            min-height: 350px;
+            min-height: 450px;
             margin: 0;
             padding: 16px;
             font-family: system-ui, -apple-system, sans-serif;
@@ -131,6 +131,54 @@
             font-size: 9px;
             color: #cbd5e1;
         }
+        .threshold-controls {
+            margin-bottom: 16px;
+            padding: 12px;
+            background: #374151;
+            border-radius: 6px;
+        }
+        .threshold-label {
+            font-size: 12px;
+            color: #f1f5f9;
+            margin-bottom: 8px;
+            display: block;
+        }
+        .threshold-slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #475569;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        .threshold-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .threshold-slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .threshold-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #94a3b8;
+            margin-top: 4px;
+        }
         .violation {
             background: #dc2626;
             padding: 8px;
@@ -156,6 +204,18 @@
     </div>
     
     <button id="analyzeBtn">Analyze Current Page</button>
+    
+    <div class="threshold-controls" id="thresholdControls" style="display: none;">
+        <label class="threshold-label" for="thresholdSlider">
+            Hide Low Contrast (Below <span id="thresholdValue">1.0</span>:1)
+        </label>
+        <input type="range" id="thresholdSlider" class="threshold-slider" 
+               min="1.0" max="3.0" step="0.1" value="1.0">
+        <div class="threshold-info">
+            <span>Show all violations</span>
+            <span>Hide minor issues</span>
+        </div>
+    </div>
     
     <div id="screenshotContainer" class="screenshot-container">
         <div class="zoom-controls">
