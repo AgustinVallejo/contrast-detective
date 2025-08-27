@@ -2,7 +2,8 @@
 
 A minimal Chrome extension that analyzes web pages for WCAG AA color contrast compliance.
 
-<img width="1498" height="850" alt="showcase" src="https://github.com/user-attachments/assets/2a80a040-6710-4c13-a728-08fd913b27b1" />
+<img width="1419" height="843" alt="image" src="https://github.com/user-attachments/assets/819220f5-5f68-4c7e-8edb-7b8031291bc0" />
+
 
 
 ## Features
