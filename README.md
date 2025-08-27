@@ -6,9 +6,6 @@ A minimal Chrome extension that analyzes web pages for WCAG AA color contrast co
 
 - ✅ One-click contrast analysis
 - 🎯 WCAG AA compliance checking (3:1 ratio minimum)
-- 📊 Detailed violation reporting
-- 🚀 No external dependencies
-- 💾 Minimal size (<10KB)
 
 ## Installation
 
