@@ -4,20 +4,80 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Contrast Detective</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-<script type="importmap">
-{
-  "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.1.1/",
-    "react": "https://aistudiocdn.com/react@^19.1.1",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
+    <style>
+        body {
+            width: 400px;
+            min-height: 300px;
+            margin: 0;
+            padding: 16px;
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #1e293b;
+            color: #f1f5f9;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        .title {
+            font-size: 18px;
+            font-weight: bold;
+            margin: 0;
+        }
+        .subtitle {
+            font-size: 12px;
+            color: #94a3b8;
+            margin: 4px 0 0 0;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        button:disabled {
+            background: #475569;
+            cursor: not-allowed;
+        }
+        .results {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .violation {
+            background: #dc2626;
+            padding: 8px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+        .no-violations {
+            text-align: center;
+            color: #22c55e;
+            padding: 20px;
+        }
+        .loading {
+            text-align: center;
+            color: #94a3b8;
+        }
+    </style>
 </head>
-<body class="bg-slate-900 text-slate-100 font-sans" style="width: 800px;">
-    <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
+<body>
+    <div class="header">
+        <h1 class="title">Contrast Detective</h1>
+        <p class="subtitle">WCAG AA Contrast Analysis</p>
+    </div>
+    
+    <button id="analyzeBtn">Analyze Current Page</button>
+    
+    <div id="results" class="results"></div>
+    
+    <script src="popup.js"></script>
 </body>
 </html>

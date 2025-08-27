@@ -1,20 +1,41 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Contrast Detective
 
-# Run and deploy your AI Studio app
+A minimal Chrome extension that analyzes web pages for WCAG AA color contrast compliance.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/drive/1m9gS25XCibHI-02P4ABO1iM3rB6gLawx
+- ✅ One-click contrast analysis
+- 🎯 WCAG AA compliance checking (3:1 ratio minimum)
+- 📊 Detailed violation reporting
+- 🚀 No external dependencies
+- 💾 Minimal size (<10KB)
 
-## Run Locally
+## Installation
 
-**Prerequisites:**  Node.js
+1. Download or clone this repository
+2. Open Chrome and navigate to `chrome://extensions/`
+3. Enable "Developer mode" in the top right
+4. Click "Load unpacked" and select the extension folder
+5. The Contrast Detective icon will appear in your toolbar
 
+## Usage
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. Navigate to any webpage
+2. Click the Contrast Detective icon in your toolbar
+3. Click "Analyze Current Page" 
+4. View any contrast violations found
+
+## Files
+
+- `manifest.json` - Extension configuration
+- `index.html` - Popup interface
+- `popup.js` - Main extension logic and contrast analysis
+
+## How it works
+
+The extension analyzes the colors of visible elements on the current page by:
+1. Extracting background and text colors from computed styles
+2. Calculating contrast ratios using WCAG formulas
+3. Reporting elements that don't meet the 3:1 minimum ratio
+
+No data is sent to external servers - all analysis happens locally in your browser.

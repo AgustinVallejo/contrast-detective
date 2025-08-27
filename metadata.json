@@ -1,5 +1,0 @@
-{
-  "name": "Contrast Detective",
-  "description": "A Chrome extension to analyze the current browser tab for WCAG AA color contrast compliance, highlighting UI elements and regions with low contrast ratios.",
-  "requestFramePermissions": []
-}

@@ -4,7 +4,8 @@
   "version": "1.0",
   "description": "Analyze the current page for WCAG AA color contrast compliance.",
   "permissions": [
-    "activeTab"
+    "activeTab",
+    "scripting"
   ],
   "action": {
     "default_popup": "index.html",
