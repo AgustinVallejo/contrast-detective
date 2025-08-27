@@ -2,39 +2,77 @@
 document.addEventListener('DOMContentLoaded', function() {
     const analyzeBtn = document.getElementById('analyzeBtn');
     const resultsDiv = document.getElementById('results');
+    const screenshotContainer = document.getElementById('screenshotContainer');
 
     analyzeBtn.addEventListener('click', async function() {
         analyzeBtn.disabled = true;
-        analyzeBtn.textContent = 'Analyzing...';
-        resultsDiv.innerHTML = '<div class="loading">Analyzing page contrast...</div>';
+        analyzeBtn.textContent = 'Capturing...';
+        resultsDiv.innerHTML = '<div class="loading">Capturing screenshot...</div>';
+        screenshotContainer.innerHTML = '';
 
         try {
             // Get the active tab
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
             
-            // Inject and execute the content script
-            const results = await chrome.scripting.executeScript({
-                target: { tabId: tab.id },
-                function: analyzePageContrast,
+            // Capture a screenshot of the visible tab
+            const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
+                format: 'png',
+                quality: 90
             });
-
-            // Handle both sync and async results
-            let violations = results[0].result;
             
-            // If result is a Promise, await it
-            if (violations && typeof violations.then === 'function') {
-                violations = await violations;
-            }
-
+            // Display the screenshot
+            displayScreenshot(dataUrl);
+            
+            // Now analyze the screenshot
+            analyzeBtn.textContent = 'Analyzing...';
+            resultsDiv.innerHTML = '<div class="loading">Analyzing contrast...</div>';
+            
+            // Create an image and analyze it
+            const violations = await analyzeScreenshot(dataUrl);
             displayResults(violations);
+            
         } catch (error) {
             console.error('Analysis error:', error);
-            resultsDiv.innerHTML = '<div class="violation">Error: Could not analyze page. Make sure you\'re on a valid webpage.</div>';
+            resultsDiv.innerHTML = `<div class="violation">Error: ${error.message}</div>`;
         } finally {
             analyzeBtn.disabled = false;
             analyzeBtn.textContent = 'Analyze Current Page';
         }
     });
+
+    function displayScreenshot(dataUrl) {
+        const img = document.createElement('img');
+        img.src = dataUrl;
+        img.className = 'screenshot';
+        img.alt = 'Page screenshot';
+        screenshotContainer.innerHTML = '';
+        screenshotContainer.appendChild(img);
+    }
+
+    async function analyzeScreenshot(dataUrl) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Set canvas to image size
+                canvas.width = img.width;
+                canvas.height = img.height;
+                
+                // Draw image to canvas
+                ctx.drawImage(img, 0, 0);
+                
+                // Get image data
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                
+                // Analyze using grid analysis
+                const violations = gridAnalysis(imageData, 32);
+                resolve(violations);
+            };
+            img.src = dataUrl;
+        });
+    }
 
     function displayResults(violations) {
         if (!violations || violations.length === 0) {
@@ -49,7 +87,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 ${violation.ratio < 2.0 ? '🔴' : '🟡'}<br>
                 Severity Score: ${violation.score.toFixed(2)}<br>
                 Location: (${violation.x}, ${violation.y})<br>
-                ${violation.element ? `Element: ${violation.element}<br>` : ''}
                 ${violation.colors && violation.colors.length >= 2 ? 
                     `Colors: rgb(${violation.colors[0].r},${violation.colors[0].g},${violation.colors[0].b}) / rgb(${violation.colors[1].r},${violation.colors[1].g},${violation.colors[1].b})` : ''}
             </div>
@@ -57,10 +94,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         resultsDiv.innerHTML = violationsHtml;
     }
-});
 
-// This function will be injected into the page
-function analyzePageContrast() {
     // =============================================================================
     // WCAG Contrast Calculation Functions
     // =============================================================================
@@ -78,8 +112,6 @@ function analyzePageContrast() {
     }
 
     function getContrastRatio(rgb1, rgb2) {
-        // If colors are identical, there is no contrast to measure.
-        // Return a high value to ensure it passes the compliance check.
         if (rgb1.r === rgb2.r && rgb1.g === rgb2.g && rgb1.b === rgb2.b) {
             return 21;
         }
@@ -93,22 +125,14 @@ function analyzePageContrast() {
         return (lighter + 0.05) / (darker + 0.05);
     }
 
-    // =============================================================================
-    // Violation Scoring Functions
-    // =============================================================================
-
     function uiContrastViolationScore(ratio) {
         if (ratio >= 3.0) return 0;
         if (ratio <= 1.0) return 1.0;
         
-        const t = (ratio - 1.0) / (3.0 - 1.0); // normalize to [0,1]
-        return 0.5 * (1 + Math.cos(Math.PI * t)); // Smooth cosine transition
+        const t = (ratio - 1.0) / (3.0 - 1.0);
+        return 0.5 * (1 + Math.cos(Math.PI * t));
     }
 
-    // =============================================================================
-    // Color Analysis Functions
-    // =============================================================================
-    
     function simpleKMeans(colors, k) {
         if (colors.length <= k) return colors;
         
@@ -180,10 +204,6 @@ function analyzePageContrast() {
         return simpleKMeans(colors, maxColors);
     }
 
-    // =============================================================================
-    // Main Analysis Pipeline
-    // =============================================================================
-
     function analyzeUIRegion(imageData, x, y, width, height) {
         const colors = extractDominantColors(imageData, x, y, width, height, 2);
         
@@ -224,84 +244,6 @@ function analyzePageContrast() {
                 }
             }
         }
-        return results;
+        return results.slice(0, 20); // Limit to 20 violations
     }
-
-    // =============================================================================
-    // Page Analysis Implementation
-    // =============================================================================
-
-    try {
-        // Since we can't use html2canvas in a content script, use DOM-based analysis
-        return analyzeDOMElements();
-        
-    } catch (error) {
-        console.error('Analysis error:', error);
-        return [];
-    }
-
-    // Enhanced DOM-based analysis using the full contrast algorithm
-    function analyzeDOMElements() {
-        const elements = document.querySelectorAll('*');
-        const violations = [];
-        const processedElements = new Set();
-        
-        for (let i = 0; i < Math.min(elements.length, 200); i++) {
-            const element = elements[i];
-            
-            // Skip if already processed or too small
-            if (processedElements.has(element)) continue;
-            
-            const rect = element.getBoundingClientRect();
-            if (rect.width < 20 || rect.height < 20) continue;
-            
-            const styles = window.getComputedStyle(element);
-            const bgColor = styles.backgroundColor;
-            const textColor = styles.color;
-            
-            // Skip elements without proper colors
-            if (!bgColor || !textColor || 
-                bgColor === 'rgba(0, 0, 0, 0)' || 
-                bgColor === 'transparent' ||
-                textColor === 'rgba(0, 0, 0, 0)') continue;
-            
-            const bg = parseColor(bgColor);
-            const text = parseColor(textColor);
-            
-            if (bg && text) {
-                const ratio = getContrastRatio(bg, text);
-                const score = uiContrastViolationScore(ratio);
-                
-                if (ratio < 3.0) {
-                    violations.push({
-                        ratio,
-                        score,
-                        x: Math.round(rect.x),
-                        y: Math.round(rect.y),
-                        colors: [bg, text],
-                        compliant: false,
-                        element: element.tagName.toLowerCase()
-                    });
-                    
-                    processedElements.add(element);
-                }
-            }
-        }
-        
-        // Sort by worst violations first (lowest ratio)
-        violations.sort((a, b) => a.ratio - b.ratio);
-        return violations.slice(0, 15);
-    }
-
-    function parseColor(colorStr) {
-        const match = colorStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-        if (match) {
-            return {
-                r: parseInt(match[1]),
-                g: parseInt(match[2]),
-                b: parseInt(match[3])
-            };
-        }
-        return null;
-    }
-}
+});
