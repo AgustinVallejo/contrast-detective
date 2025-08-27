@@ -3,12 +3,23 @@ document.addEventListener('DOMContentLoaded', function() {
     const analyzeBtn = document.getElementById('analyzeBtn');
     const resultsDiv = document.getElementById('results');
     const screenshotContainer = document.getElementById('screenshotContainer');
+    const zoomInBtn = document.getElementById('zoomInBtn');
+    const zoomOutBtn = document.getElementById('zoomOutBtn');
+    const resetZoomBtn = document.getElementById('resetZoomBtn');
+    const zoomLevelSpan = document.getElementById('zoomLevel');
+
+    let currentZoom = 1;
+    let currentScreenshot = null;
+    let isDragging = false;
+    let dragStart = { x: 0, y: 0 };
+    let imagePosition = { x: 0, y: 0 };
 
     analyzeBtn.addEventListener('click', async function() {
         analyzeBtn.disabled = true;
         analyzeBtn.textContent = 'Capturing...';
         resultsDiv.innerHTML = '<div class="loading">Capturing screenshot...</div>';
         screenshotContainer.innerHTML = '';
+        resetZoom();
 
         try {
             // Get the active tab
@@ -40,13 +51,175 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // Zoom control event listeners
+    zoomInBtn.addEventListener('click', function() {
+        zoomIn();
+    });
+
+    zoomOutBtn.addEventListener('click', function() {
+        zoomOut();
+    });
+
+    resetZoomBtn.addEventListener('click', function() {
+        resetZoom();
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if (!currentScreenshot) return;
+        
+        switch(e.key) {
+            case '+':
+            case '=':
+                e.preventDefault();
+                zoomIn();
+                break;
+            case '-':
+                e.preventDefault();
+                zoomOut();
+                break;
+            case '0':
+                e.preventDefault();
+                resetZoom();
+                break;
+            case 'ArrowLeft':
+                if (currentZoom > 1) {
+                    e.preventDefault();
+                    imagePosition.x += 20 / currentZoom;
+                    updateZoom();
+                }
+                break;
+            case 'ArrowRight':
+                if (currentZoom > 1) {
+                    e.preventDefault();
+                    imagePosition.x -= 20 / currentZoom;
+                    updateZoom();
+                }
+                break;
+            case 'ArrowUp':
+                if (currentZoom > 1) {
+                    e.preventDefault();
+                    imagePosition.y += 20 / currentZoom;
+                    updateZoom();
+                }
+                break;
+            case 'ArrowDown':
+                if (currentZoom > 1) {
+                    e.preventDefault();
+                    imagePosition.y -= 20 / currentZoom;
+                    updateZoom();
+                }
+                break;
+        }
+    });
+
+    // Zoom functions
+    function zoomIn() {
+        if (currentZoom < 4) {
+            currentZoom = Math.min(4, currentZoom * 1.5);
+            updateZoom();
+        }
+    }
+
+    function zoomOut() {
+        if (currentZoom > 1) {
+            currentZoom = Math.max(1, currentZoom / 1.5);
+            updateZoom();
+        }
+    }
+
+    function resetZoom() {
+        currentZoom = 1;
+        imagePosition = { x: 0, y: 0 };
+        updateZoom();
+    }
+
+    function updateZoom() {
+        if (currentScreenshot) {
+            const transform = `scale(${currentZoom}) translate(${imagePosition.x}px, ${imagePosition.y}px)`;
+            currentScreenshot.style.transform = transform;
+            zoomLevelSpan.textContent = `${Math.round(currentZoom * 100)}%`;
+            
+            // Update button states
+            zoomInBtn.disabled = currentZoom >= 4;
+            zoomOutBtn.disabled = currentZoom <= 1; // Can't zoom out beyond 100%
+            
+            // Update cursor based on zoom level
+            if (currentZoom > 1) {
+                currentScreenshot.style.cursor = isDragging ? 'grabbing' : 'grab';
+            } else {
+                currentScreenshot.style.cursor = 'default';
+            }
+        }
+    }
+
     function displayScreenshot(dataUrl) {
         const img = document.createElement('img');
         img.src = dataUrl;
         img.className = 'screenshot';
         img.alt = 'Page screenshot';
-        screenshotContainer.innerHTML = '';
+        
+        // Add drag functionality
+        img.addEventListener('mousedown', handleMouseDown);
+        img.addEventListener('wheel', handleWheel);
+        
+        // Prevent image selection and context menu
+        img.addEventListener('dragstart', e => e.preventDefault());
+        img.addEventListener('contextmenu', e => e.preventDefault());
+        
+        // Clear existing screenshot but keep controls
+        const existingScreenshot = screenshotContainer.querySelector('.screenshot');
+        if (existingScreenshot) {
+            existingScreenshot.remove();
+        }
+        
         screenshotContainer.appendChild(img);
+        currentScreenshot = img;
+        resetZoom();
+    }
+
+    // Mouse drag handlers for panning
+    function handleMouseDown(e) {
+        if (currentZoom <= 1) return;
+        
+        isDragging = true;
+        dragStart = { x: e.clientX, y: e.clientY };
+        currentScreenshot.style.cursor = 'grabbing';
+        
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        e.preventDefault();
+    }
+
+    function handleMouseMove(e) {
+        if (!isDragging) return;
+        
+        const deltaX = (e.clientX - dragStart.x) / currentZoom;
+        const deltaY = (e.clientY - dragStart.y) / currentZoom;
+        
+        imagePosition.x += deltaX;
+        imagePosition.y += deltaY;
+        
+        dragStart = { x: e.clientX, y: e.clientY };
+        updateZoom();
+    }
+
+    function handleMouseUp() {
+        isDragging = false;
+        currentScreenshot.style.cursor = 'grab';
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+    }
+
+    // Mouse wheel zoom support
+    function handleWheel(e) {
+        e.preventDefault();
+        
+        if (e.deltaY < 0) {
+            zoomIn();
+        } else {
+            zoomOut();
+        }
     }
 
     async function analyzeScreenshot(dataUrl) {
@@ -100,8 +273,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function displayAnnotatedScreenshot(canvas) {
         canvas.className = 'screenshot';
-        screenshotContainer.innerHTML = '';
+        
+        // Add drag functionality to canvas
+        canvas.addEventListener('mousedown', handleMouseDown);
+        canvas.addEventListener('wheel', handleWheel);
+        
+        // Prevent image selection and context menu
+        canvas.addEventListener('dragstart', e => e.preventDefault());
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
+        
+        // Remove the old screenshot but keep the controls
+        const existingScreenshot = screenshotContainer.querySelector('.screenshot');
+        if (existingScreenshot) {
+            existingScreenshot.remove();
+        }
+        
         screenshotContainer.appendChild(canvas);
+        currentScreenshot = canvas;
+        updateZoom();
     }
 
     function displayResults(violations) {
