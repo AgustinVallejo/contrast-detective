@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Contrast Detective",
+  "version": "1.0",
+  "description": "Analyze the current page for WCAG AA color contrast compliance.",
+  "permissions": [
+    "activeTab"
+  ],
+  "action": {
+    "default_popup": "index.html",
+    "default_title": "Contrast Detective"
+  }
+}
